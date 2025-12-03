@@ -1,55 +1,37 @@
-name: CI
+name: DVWA Startup Test
 
 on:
   push:
-    branches: [ "master" ]
-  pull_request:
-    branches: [ "master" ]
+  workflow_dispatch:
 
 jobs:
-  test:
+  start-dvwa:
     runs-on: ubuntu-latest
-
-    services:
-      db:
-        image: mariadb:10
-        env:
-          MYSQL_ROOT_PASSWORD: dvwa
-          MYSQL_DATABASE: dvwa
-          MYSQL_USER: dvwa
-          MYSQL_PASSWORD: p@ssw0rd
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -udvwa -pp@ssw0rd"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
-      dvwa:
-        image: vulnerables/web-dvwa
-        ports:
-          - 80:80
-        # 👇 THIS FIXES YOUR PROBLEM  
-        options: --health-cmd="exit 0"
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
-      - name: Wait for database to be ready
+      - name: Start DVWA using docker-compose
         run: |
-          echo "Waiting for DB..."
-          for i in {1..30}; do
-            if docker exec "$(docker ps -qf name=db)" mysqladmin ping -h 127.0.0.1 -udvwa -pp@ssw0rd --silent; then
-              echo "DB is ready!"
-              break
+          docker compose -f docker-compose.yml up -d
+          echo "Waiting for DVWA to become healthy..."
+
+          # Wait up to ~60 seconds
+          for i in {1..20}; do
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' dvwa 2>/dev/null || echo "starting")
+            echo "DVWA status: $STATUS"
+            if [ "$STATUS" = "healthy" ]; then
+              echo "DVWA is ready!"
+              exit 0
             fi
-            echo "Waiting..."
-            sleep 2
+            sleep 3
           done
 
-      - name: Run simple test
-        run: |
-          echo "Containers are running."
-          docker ps
+          echo "DVWA did not become ready in time."
+          docker logs dvwa
+          exit 1
+
+      - name: Print DVWA container logs
+        if: failure()
+        run: docker logs dvwa
