@@ -8,7 +8,6 @@ on:
 jobs:
   zap-full-scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
     - name: Checkout repository
@@ -17,14 +16,14 @@ jobs:
     - name: Start DVWA containers
       run: docker compose -f compose.yml up -d
 
-    - name: Wait for DVWA to be ready
+    - name: Wait for DVWA...
       run: |
-        echo "Waiting for DVWA health..."
+        echo "Waiting for DVWA..."
         for i in {1..40}; do
           STATUS=$(docker inspect --format='{{.State.Health.Status}}' dvwa-dvwa-1 2>/dev/null || echo "starting")
-          echo "DVWA status: $STATUS"
+          echo "STATUS: $STATUS"
           if [ "$STATUS" = "healthy" ]; then
-            echo "DVWA is healthy!"
+            echo "DVWA is ready!"
             break
           fi
           sleep 5
@@ -32,18 +31,18 @@ jobs:
 
     - name: Run ZAP Full Scan
       run: |
+        mkdir -p zap-out
         docker run --network=host \
-          -v "$(pwd):/zap/wrk:rw" \
+          -v "$(pwd)/zap-out:/zap/wrk:rw" \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-full-scan.py \
           -t http://127.0.0.1:4280 \
           -r zap-full-report.html \
-          -w zap-full-warnings.md
+          -x zap-full-report.xml \
+          -j
 
     - name: Upload ZAP Full Scan Report
       uses: actions/upload-artifact@v4
       with:
         name: zap-full-report
-        path: |
-          zap-full-report.html
-          zap-full-warnings.md
+        path: zap-out/
