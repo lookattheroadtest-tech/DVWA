@@ -12,9 +12,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Start DVWA using docker-compose
+      - name: Start DVWA using compose
         run: |
-          docker compose -f docker-compose.yml up -d
+          docker compose -f compose.yml up -d
           echo "Waiting for DVWA to become healthy..."
 
           # Wait up to ~60 seconds
