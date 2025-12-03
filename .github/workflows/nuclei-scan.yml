@@ -1,0 +1,51 @@
+name: Nuclei Scan
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  nuclei-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+
+    - name: Start DVWA containers
+      run: docker compose -f compose.yml up -d
+
+    - name: Wait for DVWA to be ready
+      run: |
+        echo "Waiting for DVWA..."
+        for i in {1..40}; do
+          STATUS=$(docker inspect --format='{{.State.Health.Status}}' dvwa-dvwa-1 2>/dev/null || echo "starting")
+          if [ "$STATUS" = "healthy" ]; then
+            echo "DVWA is ready!"
+            break
+          fi
+          sleep 5
+        done
+
+    - name: Install Nuclei
+      run: |
+        curl -sSL https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
+        | grep "browser_download_url" \
+        | grep "linux_amd64.zip" \
+        | cut -d '"' -f 4 \
+        | wget -qi -
+        unzip *linux_amd64.zip
+        sudo mv nuclei /usr/local/bin/nuclei
+        nuclei -update-templates
+
+    - name: Run Nuclei Scan
+      run: |
+        mkdir -p nuclei-output
+        nuclei -u http://127.0.0.1:4280 -o nuclei-output/nuclei-results.txt
+
+    - name: Upload Nuclei Results
+      uses: actions/upload-artifact@v4
+      with:
+        name: nuclei-results
+        path: nuclei-output/nuclei-results.txt
