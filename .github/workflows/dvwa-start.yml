@@ -1,25 +1,13 @@
 name: DVWA-Startup-Test
 
 on:
-  workflow_dispatch:   # <-- THIS is required
+  workflow_dispatch:
 
 jobs:
   start-dvwa:
     runs-on: ubuntu-latest
 
     services:
-      dvwa:
-        image: ghcr.io/digininja/dvwa
-        ports:
-          - 4280:80
-        env:
-          DB_SERVER: db
-        options: >-
-          --health-cmd "curl -s http://localhost | grep -q 'DVWA' || exit 1"
-          --health-interval 5s
-          --health-timeout 2s
-          --health-retries 20
-
       db:
         image: mariadb:10
         env:
@@ -28,16 +16,24 @@ jobs:
           MYSQL_USER: dvwa
           MYSQL_PASSWORD: p@ssw0rd
 
+      dvwa:
+        image: ghcr.io/digininja/dvwa
+        ports:
+          - 4280:80
+        env:
+          DB_SERVER: db
+
     steps:
-      - name: Wait for DVWA health check
+      - name: Wait for DVWA to respond
         run: |
-          echo "Waiting for DVWA..."
-          for i in {1..40}; do
+          echo "Checking DVWA startup..."
+          for i in {1..50}; do
             if curl -s http://localhost:4280 | grep -q "DVWA"; then
-              echo "DVWA is up!"
+              echo "DVWA is UP!"
               exit 0
             fi
             echo "Still waiting..."
             sleep 3
           done
-          echo "DVWA never started" && exit 1
+          echo "DVWA FAILED to start"
+          exit 1
