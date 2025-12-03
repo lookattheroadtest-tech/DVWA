@@ -28,17 +28,20 @@ jobs:
           sleep 5
         done
 
+    - name: Create writable folder for ZAP
+      run: mkdir zap-output && chmod 777 zap-output
+
     - name: Run ZAP Baseline Scan
       run: |
         docker run --network=host \
-          -v "$(pwd):/zap/wrk:rw" \
+          -v "$(pwd)/zap-output:/zap/wrk" \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
           -t http://127.0.0.1:4280 \
-          -r zap-report.html
+          -r zap-report.html || true
 
     - name: Upload ZAP Report
       uses: actions/upload-artifact@v4
       with:
         name: zap-report
-        path: zap-report.html
+        path: zap-output/zap-report.html
