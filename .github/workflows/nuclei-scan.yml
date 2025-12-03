@@ -1,7 +1,6 @@
 name: Nuclei Scan
 
 on:
-  workflow_dispatch:
   push:
   pull_request:
 
@@ -21,6 +20,7 @@ jobs:
         echo "Waiting for DVWA..."
         for i in {1..40}; do
           STATUS=$(docker inspect --format='{{.State.Health.Status}}' dvwa-dvwa-1 2>/dev/null || echo "starting")
+          echo "Status: $STATUS"
           if [ "$STATUS" = "healthy" ]; then
             echo "DVWA is ready!"
             break
@@ -30,22 +30,22 @@ jobs:
 
     - name: Install Nuclei
       run: |
-        curl -sSL https://api.github.com/repos/projectdiscovery/nuclei/releases/latest \
-        | grep "browser_download_url" \
-        | grep "linux_amd64.zip" \
-        | cut -d '"' -f 4 \
-        | wget -qi -
-        unzip *linux_amd64.zip
-        sudo mv nuclei /usr/local/bin/nuclei
-        nuclei -update-templates
+        LATEST=$(curl -sSL https://api.github.com/repos/projectdiscovery/nuclei/releases/latest | grep tag_name | cut -d '"' -f4)
+        echo "Latest version: $LATEST"
 
-    - name: Run Nuclei Scan
+        curl -LO https://github.com/projectdiscovery/nuclei/releases/download/${LATEST}/nuclei_${LATEST#v}_linux_amd64.zip
+
+        unzip -o nuclei_*_linux_amd64.zip   # <-- FIX: force overwrite, no prompts
+        sudo mv nuclei /usr/local/bin/nuclei
+        nuclei -version
+
+    - name: Run Nuclei scan
       run: |
         mkdir -p nuclei-output
-        nuclei -u http://127.0.0.1:4280 -o nuclei-output/nuclei-results.txt
+        nuclei -u http://127.0.0.1:4280 -o nuclei-output/results.txt
 
     - name: Upload Nuclei Results
       uses: actions/upload-artifact@v4
       with:
         name: nuclei-results
-        path: nuclei-output/nuclei-results.txt
+        path: nuclei-output/results.txt
