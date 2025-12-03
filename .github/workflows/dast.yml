@@ -10,20 +10,28 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Start DVWA containers
       run: docker compose -f compose.yml up -d
 
-    - name: Wait for DVWA (skip health check)
+    - name: Wait for DVWA to be ready
       run: |
-        echo "Skipping health check — waiting 10 seconds..."
-        sleep 10
+        echo "Waiting for DVWA health..."
+        for i in {1..30}; do
+          STATUS=$(docker inspect --format='{{.State.Health.Status}}' dvwa-dvwa-1 2>/dev/null || echo "starting")
+          echo "DVWA status: $STATUS"
+          if [ "$STATUS" = "healthy" ]; then
+            echo "DVWA is healthy!"
+            break
+          fi
+          sleep 5
+        done
 
     - name: Run ZAP Baseline Scan
       run: |
         docker run --network=host \
-          -v $(pwd):/zap/wrk \
+          -v "$(pwd):/zap/wrk:rw" \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-baseline.py \
           -t http://127.0.0.1:4280 \
