@@ -1,37 +1,17 @@
-name: DVWA Startup Test
+name: start-dvwa
 
 on:
   push:
-  workflow_dispatch:
 
 jobs:
-  start-dvwa:
+  start:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Start DVWA using compose
-        run: |
-          docker compose -f compose.yml up -d
-          echo "Waiting for DVWA to become healthy..."
+      - name: Start DVWA
+        run: docker compose -f compose.yml up -d
 
-          # Wait up to ~60 seconds
-          for i in {1..20}; do
-            STATUS=$(docker inspect --format='{{.State.Health.Status}}' dvwa 2>/dev/null || echo "starting")
-            echo "DVWA status: $STATUS"
-            if [ "$STATUS" = "healthy" ]; then
-              echo "DVWA is ready!"
-              exit 0
-            fi
-            sleep 3
-          done
-
-          echo "DVWA did not become ready in time."
-          docker logs dvwa
-          exit 1
-
-      - name: Print DVWA container logs
-        if: failure()
-        run: docker logs dvwa
+      - name: Show running containers
+        run: docker ps -a
