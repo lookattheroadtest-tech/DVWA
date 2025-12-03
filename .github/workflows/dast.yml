@@ -1,0 +1,44 @@
+name: ZAP Baseline DAST
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  zap-baseline:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Start DVWA containers
+      run: docker compose -f compose.yml up -d
+
+    - name: Wait for DVWA to be ready
+      run: |
+        echo "Waiting for DVWA health..."
+        for i in {1..30}; do
+          STATUS=$(docker inspect --format='{{.State.Health.Status}}' dvwa-dvwa-1 2>/dev/null || echo "starting")
+          echo "DVWA status: $STATUS"
+          if [ "$STATUS" = "healthy" ]; then
+            echo "DVWA is healthy!"
+            break
+          fi
+          sleep 5
+        done
+
+    - name: Run ZAP Baseline Scan
+      run: |
+        docker run --network=host \
+          -v $(pwd):/zap/wrk \
+          ghcr.io/zaproxy/zaproxy:stable \
+          zap-baseline.py \
+          -t http://127.0.0.1:4280 \
+          -r zap-report.html
+
+    - name: Upload ZAP Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: zap-report
+        path: zap-report.html
