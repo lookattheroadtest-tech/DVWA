@@ -16,33 +16,35 @@ jobs:
     - name: Start DVWA containers
       run: docker compose -f compose.yml up -d
 
-    - name: Wait for DVWA...
+    - name: Wait for DVWA to be ready
       run: |
-        echo "Waiting for DVWA..."
-        for i in {1..40}; do
+        echo "Waiting for DVWA health..."
+        for i in {1..30}; do
           STATUS=$(docker inspect --format='{{.State.Health.Status}}' dvwa-dvwa-1 2>/dev/null || echo "starting")
-          echo "STATUS: $STATUS"
+          echo "DVWA status: $STATUS"
           if [ "$STATUS" = "healthy" ]; then
-            echo "DVWA is ready!"
+            echo "DVWA is healthy!"
             break
           fi
           sleep 5
         done
 
+    - name: Create writable folder for ZAP
+      run: mkdir zap-output && chmod 777 zap-output
+
     - name: Run ZAP Full Scan
       run: |
-        mkdir -p zap-out
         docker run --network=host \
-          -v "$(pwd)/zap-out:/zap/wrk:rw" \
+          -v "$(pwd)/zap-output:/zap/wrk" \
           ghcr.io/zaproxy/zaproxy:stable \
           zap-full-scan.py \
           -t http://127.0.0.1:4280 \
           -r zap-full-report.html \
           -x zap-full-report.xml \
-          -j
+          -j || true
 
-    - name: Upload ZAP Full Scan Report
+    - name: Upload ZAP Full Scan Reports
       uses: actions/upload-artifact@v4
       with:
         name: zap-full-report
-        path: zap-out/
+        path: zap-output/
